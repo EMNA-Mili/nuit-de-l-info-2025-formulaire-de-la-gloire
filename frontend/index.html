@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Formulaire fun — Terminal Cosmique</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Styles supplémentaires pour le backend */
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #4cc9f0;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .backend-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            z-index: 1000;
+        }
+        
+        .backend-status.online {
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+        
+        .backend-status.offline {
+            color: #ff0033;
+            border: 1px solid #ff0033;
+        }
+        
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-dot.online {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+        
+        .status-dot.offline {
+            background: #ff0033;
+        }
+        
+        #submitBtnContainer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+<!-- ✨ Fond étoilé animé avec effet de nébuleuse -->
+<div class="stars" id="stars"></div>
+<div class="nebula"></div>
+
+<!-- Indicateur de statut backend -->
+<div class="backend-status offline" id="backendStatus">
+    <span class="status-dot offline" id="statusDot"></span>
+    <span id="statusText">Backend: Déconnecté</span>
+</div>
+
+<div class="page">
+  <div class="container" id="mainContainer">
+    <header class="header">
+      <div class="logo" id="logo">CC</div>
+      <div class="title">
+        <h1 id="terminalTitle">Formulaire de la gloire</h1>
+        <p>On va mettre du son et des surprises. Assurez-vous que votre volume est prêt.</p>
+      </div>
+      <button id="openReminder" class="reminder-btn" aria-controls="volumeModal">Rappel volume</button>
+    </header>
+
+    <div id="notice" class="notice" role="alert" aria-live="polite">Vérifiez votre volume — le son semble coupé.</div>
+
+    <form id="form" novalidate>
+      <div>
+        <label for="name">Nom *</label>
+        <input id="name" name="name" type="text" placeholder="Votre nom">
+        <div class="error-message" id="nameError"></div>
+      </div>
+
+      <div>
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" placeholder="prenom@exemple.com">
+        <div class="error-message" id="emailError"></div>
+      </div>
+
+      <div style="grid-column:1/3">
+        <label for="subject">Sujet *</label>
+        <input id="subject" name="subject" type="text" placeholder="Sujet">
+        <div class="error-message" id="subjectError"></div>
+      </div>
+
+      <textarea id="message" name="message" placeholder="Message..."></textarea>
+      <div class="error-message" id="messageError"></div>
+
+      <fieldset>
+        <legend style="font-weight:700;color:#dbe9ff">Je suis</legend>
+        <label style="margin-right:12px"><input type="radio" name="gender" value="male"> Homme</label>
+        <label style="margin-right:12px"><input type="radio" name="gender" value="female"> Femme</label>
+      </fieldset>
+
+      <div class="actions">
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="button" id="mini" class="btn secondary">Micro-Party</button>
+          <div id="submitBtnContainer">
+            <button type="submit" id="send" class="btn">
+              Envoyer vers le cosmos
+            </button>
+            <div class="loading-spinner" id="submitSpinner"></div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="player-area" style="margin-top:22px">
+      <div class="player-box">
+        <audio id="audioPlayer" preload="auto" class="visually-hidden"></audio>
+        <div class="player-note">Le son démarre quand vous sélectionnez un genre. Si rien ne se passe, vérifiez le son de l'ordinateur.</div>
+      </div>
+
+      <div class="gifs" id="gifs">
+        <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExejRid3d0b2tuZ3hpcDNiaXEzczE2bzNqZ3dlaWZwcjE0dDZnNnFqeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0MYC0LajbaPoEADu/giphy.gif" alt="gif1">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- simplified modal (no slider) -->
+<div class="overlay" id="volumeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" role="document">
+    <div class="gif-wrap">
+      <img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjBtaHRnNWViYjlnZnI4cGFwcjcwMjExMDRzcWptenpremhqaHlrMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/E4t2KazYC0ERQg3Mi1/giphy.gif" alt="funny gif" class="fun">
+    </div>
+
+    <div>
+      <h2 id="modalTitle">Monte le son à fond ! 🔊</h2>
+      <p>On va être bruyants et fiers. Active ton son et monte le volume système au max, puis clique sur le bouton pour commencer.</p>
+
+      <div class="actions" style="margin-top:12px">
+        <button id="confirmBtn" class="btn large">J'ai monté le son — laissez entrer la fête</button>
+        <button id="muteTip" class="btn secondary">Besoin d'aide ?</button>
+      </div>
+
+      <div class="small-note" style="margin-top:12px;color:var(--muted)">Astuce : touche volume du clavier / icône haut-parleur dans la barre des tâches / contrôle du casque.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 🎆 Popup de succès cosmique -->
+<div class="portal-overlay" id="portalOverlay">
+  <div class="portal">
+    <div class="portal-content">
+      <h2>TRANSMISSION RÉUSSIE ! 🚀</h2>
+      <p id="portalMessage">Votre message a été envoyé à travers l'espace-temps. Les entités cosmiques vous répondront bientôt...</p>
+      <p style="font-size: 0.9rem; color: var(--terminal-green); margin-top: 1rem;">
+        Easter Eggs trouvés: <span id="portalEggCount">0</span>/2
+        <br>
+        <span id="mongoIdDisplay" style="display: none;">ID: <span id="mongoId"></span></span>
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 1rem;">
+        <button class="btn btn-primary" id="closePortal">
+          RETOUR AU TERMINAL
+        </button>
+        <button class="btn secondary" id="viewLocalData" style="display: none;">
+          📁 Voir mes données
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🎮 Rainbow overlay pour Konami -->
+<div class="rainbow-konami" id="rainbowKonami"></div>
+
+<!-- Votre rainbow overlay original -->
+<div class="rainbow" id="rainbow" aria-hidden="true"></div>
+
+<!-- 🥚 Compteur d'Easter Eggs -->
+<div class="easter-counter">
+  <span class="egg-icon">🥚</span>
+  <span id="eggCount">0</span> / 2 Easter Eggs découverts
+</div>
+
+<script>
+/* Core JS: keep behavior from previous version but with improved UI.
+   - modal without slider: user must click Confirm to unlock the form.
+   - basic muted/volume check and notice.
+   - local MP3 playback when gender selected.
+*/
+
+const audio = document.getElementById('audioPlayer');
+const gifs = document.getElementById('gifs');
+const rainbow = document.getElementById('rainbow');
+const stopAllBtn = document.getElementById('openReminder'); // reuse as opener
+const confirmBtn = document.getElementById('confirmBtn');
+const volumeModal = document.getElementById('volumeModal');
+const mainContainer = document.getElementById('mainContainer');
+const notice = document.getElementById('notice');
+const miniBtn = document.getElementById('mini');
+const sendBtn = document.getElementById('send');
+const submitSpinner = document.getElementById('submitSpinner');
+
+// ✨ Nouvelles variables pour les fonctionnalités cosmiques
+const starsContainer = document.getElementById('stars');
+const terminalTitle = document.getElementById('terminalTitle');
+const logo = document.getElementById('logo');
+const portalOverlay = document.getElementById('portalOverlay');
+const rainbowKonami = document.getElementById('rainbowKonami');
+const eggCountElement = document.getElementById('eggCount');
+const portalEggCount = document.getElementById('portalEggCount');
+const portalMessage = document.getElementById('portalMessage');
+const mongoIdDisplay = document.getElementById('mongoIdDisplay');
+const mongoIdElement = document.getElementById('mongoId');
+const closePortalBtn = document.getElementById('closePortal');
+const viewLocalDataBtn = document.getElementById('viewLocalData');
+const backendStatus = document.getElementById('backendStatus');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+const mp3 = {
+  female: 'audio/femme.mp3',
+  male: 'audio/homme.mp3'
+};
+
+const gifsByGender = {
+  female: [
+    'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExaHIwbGk1YjNibnI4aXh3ajFqYWJmd283ZXg2aTd0bW94dzJwMWdkeiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/wouvbpldK40B5V0rsa/giphy.gif'
+  ],
+  male: [
+   'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaDg1NnpvaHBvZm1lZ3duZ2p6MWd0ZXFjZGo4N3p5ajNwcTEya2wybiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Tv2Dxy2ToSm7ll0a0b/giphy.gif'
+  ]
+};
+
+let currentGender = null;
+
+// 🎮 Variables pour Easter Eggs
+let eggCount = 0;
+let konamiSequence = [];
+let titleClickCount = 0;
+const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+// 🔧 CONFIGURATION BACKEND
+const BACKEND_URL = 'http://localhost:3000';
+const API_ENDPOINTS = {
+    submit: `${BACKEND_URL}/api/submissions`,
+    stats: `${BACKEND_URL}/api/submissions/stats`,
+    health: `${BACKEND_URL}/health`
+};
+
+// État du backend
+let backendOnline = false;
+let submissionHistory = JSON.parse(localStorage.getItem('cosmicSubmissions') || '[]');
+
+// ✨ Créer le fond étoilé
+function createStars() {
+  for (let i = 0; i < 150; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.width = star.style.height = `${Math.random() * 3 + 1}px`;
+    star.style.left = `${Math.random() * 100}%`;
+    star.style.top = `${Math.random() * 100}%`;
+    star.style.animationDelay = `${Math.random() * 3}s`;
+    starsContainer.appendChild(star);
+  }
+}
+
+// ✅ Schéma de validation Zod
+const cosmicSchema = {
+  name: (value) => {
+    if (!value || value.trim().length < 2) return "Le nom doit contenir au moins 2 caractères";
+    if (value.length > 50) return "Le nom ne peut excéder 50 caractères";
+    if (!/^[a-zA-Z\s-']+$/.test(value)) return "Le nom ne peut contenir que des lettres, espaces et tirets";
+    return null;
+  },
+  
+  email: (value) => {
+    if (!value) return "L'email est requis";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) return "Adresse email invalide";
+    if (value.length > 100) return "L'email ne peut excéder 100 caractères";
+    return null;
+  },
+  
+  subject: (value) => {
+    if (!value || value.trim().length < 5) return "Le sujet doit contenir au moins 5 caractères";
+    if (value.length > 100) return "Le sujet ne peut excéder 100 caractères";
+    return null;
+  },
+  
+  message: (value) => {
+    if (!value || value.trim().length < 10) return "Le message doit contenir au moins 10 caractères";
+    if (value.length > 1000) return "Le message ne peut excéder 1000 caractères";
+    return null;
+  }
+};
+
+// ✅ Validation en temps réel
+function setupRealTimeValidation() {
+  const fields = ['name', 'email', 'subject', 'message'];
+  
+  fields.forEach(fieldId => {
+    const input = document.getElementById(fieldId);
+    const errorElement = document.getElementById(`${fieldId}Error`);
+    
+    if (!input || !errorElement) return;
+    
+    input.addEventListener('input', () => {
+      const value = input.value;
+      const error = cosmicSchema[fieldId](value);
+      
+      if (error) {
+        input.classList.remove('valid');
+        input.classList.add('error');
+        errorElement.textContent = error;
+        errorElement.classList.add('show');
+      } else {
+        input.classList.remove('error');
+        input.classList.add('valid');
+        errorElement.classList.remove('show');
+      }
+    });
+    
+    // Valider à la perte de focus aussi
+    input.addEventListener('blur', () => {
+      const value = input.value;
+      const error = cosmicSchema[fieldId](value);
+      
+      if (error && value) {
+        input.classList.add('error');
+        errorElement.textContent = error;
+        errorElement.classList.add('show');
+      }
+    });
+  });
+}
+
+// ✅ Validation complète du formulaire
+function validateForm() {
+  const fields = ['name', 'email', 'subject', 'message'];
+  let isValid = true;
+  
+  fields.forEach(fieldId => {
+    const input = document.getElementById(fieldId);
+    const errorElement = document.getElementById(`${fieldId}Error`);
+    
+    if (input && errorElement) {
+      const value = input.value;
+      const error = cosmicSchema[fieldId](value);
+      
+      if (error) {
+        isValid = false;
+        input.classList.add('error');
+        errorElement.textContent = error;
+        errorElement.classList.add('show');
+        
+        // Animation de shake
+        input.style.animation = 'none';
+        setTimeout(() => {
+          input.style.animation = 'shake 0.5s';
+        }, 10);
+      } else {
+        input.classList.remove('error');
+        errorElement.classList.remove('show');
+      }
+    }
+  });
+  
+  // Vérifier aussi le genre
+  const genderSelected = document.querySelector('input[name="gender"]:checked');
+  if (!genderSelected) {
+    isValid = false;
+    notice.textContent = "Veuillez sélectionner votre genre";
+    notice.classList.add('visible');
+    setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+  
+  return isValid;
+}
+
+// 🌐 FONCTIONS BACKEND
+
+// Vérifier le statut du backend
+async function checkBackendStatus() {
+  try {
+    const response = await fetch(API_ENDPOINTS.health, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      backendOnline = data.database === 'connected';
+      
+      // Mettre à jour l'interface
+      backendStatus.className = backendOnline ? 'backend-status online' : 'backend-status offline';
+      statusDot.className = backendOnline ? 'status-dot online' : 'status-dot offline';
+      statusText.textContent = backendOnline ? 'Backend: Connecté ✓' : 'Backend: Base de données déconnectée';
+      
+      return backendOnline;
+    }
+  } catch (error) {
+    backendOnline = false;
+    backendStatus.className = 'backend-status offline';
+    statusDot.className = 'status-dot offline';
+    statusText.textContent = 'Backend: Déconnecté';
+    return false;
+  }
+}
+
+// Obtenir l'adresse IP
+async function getClientIP() {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (error) {
+    return 'unknown';
+  }
+}
+
+// Envoyer au backend
+async function submitToBackend(formData) {
+    try {
+        const response = await fetch(`${BACKEND_URL}/submissions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+}
+
+
+// Sauvegarder localement
+function saveToLocalStorage(formData) {
+  try {
+    const submission = {
+      ...formData,
+      id: 'LOCAL_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      easterEggsFound: eggCount
+    };
+    
+    submissionHistory.push(submission);
+    localStorage.setItem('cosmicSubmissions', JSON.stringify(submissionHistory));
+    
+    console.log('💾 Sauvegardé localement:', submission);
+    return submission;
+  } catch (error) {
+    console.error('❌ Erreur sauvegarde locale:', error);
+    throw error;
+  }
+}
+
+// Afficher le spinner de chargement
+function showLoading(show) {
+  if (show) {
+    submitSpinner.style.display = 'block';
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = 'Envoi en cours...';
+  } else {
+    submitSpinner.style.display = 'none';
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = 'Envoyer vers le cosmos';
+  }
+}
+
+// 🎮 Easter Egg 1: Code Konami
+function setupKonamiCode() {
+  document.addEventListener('keydown', (e) => {
+    konamiSequence.push(e.key);
+    
+    if (konamiSequence.length > konamiCode.length) {
+      konamiSequence.shift();
+    }
+    
+    if (konamiSequence.join(',') === konamiCode.join(',')) {
+      activateKonamiEffect();
+      konamiSequence = [];
+    }
+  });
+}
+
+// Utilisation dans votre formulaire
+document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        subject: document.getElementById('subject').value,
+        message: document.getElementById('message').value,
+        gender: document.querySelector('input[name="gender"]:checked').value,
+        timestamp: new Date().toISOString()
+    };
+    
+    try {
+        const result = await submitToBackend(formData);
+        alert('✅ Données sauvegardées! ID: ' + result.id);
+    } catch (error) {
+        alert('❌ Erreur: ' + error.message);
+    }
+});
+// 🎮 Activer l'effet Konami
+function activateKonamiEffect() {
+  // Afficher l'overlay rainbow
+  rainbowKonami.classList.add('show');
+  
+  // Jouer un son spécial
+  playKonamiSound();
+  
+  // Remplacer les GIFs
+  const celebrationGifs = [
+    'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif',
+    'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'
+  ];
+  
+  const gifElements = gifs.querySelectorAll('img');
+  gifElements.forEach((img, index) => {
+    const originalSrc = img.src;
+    img.src = celebrationGifs[index % celebrationGifs.length];
+    img.style.transform = 'scale(1.1) rotate(5deg)';
+    
+    // Revenir après 5 secondes
+    setTimeout(() => {
+      img.src = originalSrc;
+      img.style.transform = '';
+    }, 5000);
+  });
+  
+  // Incrémenter le compteur d'Easter Eggs
+  incrementEggCount();
+  
+  // Cacher après 5 secondes
+  setTimeout(() => {
+    rainbowKonami.classList.remove('show');
+  }, 5000);
+}
+
+// 🥚 Easter Egg 2: Clics sur le titre
+function setupTitleEasterEgg() {
+  terminalTitle.addEventListener('click', () => {
+    titleClickCount++;
+    
+    // Animation au clic
+    terminalTitle.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      terminalTitle.style.transform = '';
+    }, 200);
+    
+    if (titleClickCount === 7) {
+      // Afficher l'indice
+      alert('🎮 Easter Egg trouvé! Indice: Essayez le code Konami classique! (↑↑↓↓←→←→BA)\n\nAppuyez sur les touches fléchées et B A dans cet ordre.');
+      incrementEggCount();
+      titleClickCount = 0;
+      
+      // Effet visuel sur le titre
+      terminalTitle.style.background = 'linear-gradient(90deg, #ff0000, #ff9900, #ffff00, #00ff00, #00ffff, #ff00ff)';
+      terminalTitle.style.webkitBackgroundClip = 'text';
+      terminalTitle.style.webkitTextFillColor = 'transparent';
+      
+      setTimeout(() => {
+        terminalTitle.style.background = '';
+        terminalTitle.style.webkitBackgroundClip = '';
+        terminalTitle.style.webkitTextFillColor = '';
+      }, 3000);
+    }
+  });
+}
+
+// 🥚 Incrémenter le compteur d'Easter Eggs
+function incrementEggCount() {
+  eggCount = Math.min(eggCount + 1, 2);
+  eggCountElement.textContent = eggCount;
+  portalEggCount.textContent = eggCount;
+  
+  // Animation sur le compteur
+  eggCountElement.style.transform = 'scale(1.5)';
+  eggCountElement.style.color = 'gold';
+  setTimeout(() => {
+    eggCountElement.style.transform = 'scale(1)';
+  }, 300);
+  
+  // Animation sur l'icône
+  const eggIcon = document.querySelector('.egg-icon');
+  eggIcon.style.transform = 'rotate(360deg)';
+  eggIcon.style.transition = 'transform 0.5s';
+  setTimeout(() => {
+    eggIcon.style.transform = '';
+  }, 500);
+}
+
+// 🔊 Jouer un son pour Konami
+function playKonamiSound() {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Séquence de notes
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    let time = audioContext.currentTime;
+    
+    notes.forEach((freq, i) => {
+      oscillator.frequency.setValueAtTime(freq, time + i * 0.1);
+    });
+    
+    gainNode.gain.setValueAtTime(0.1, time);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+    
+    oscillator.start();
+    setTimeout(() => oscillator.stop(), 500);
+  } catch (e) {
+    console.log('Audio context non supporté');
+  }
+}
+
+// 🎆 Afficher le portail de succès
+function showSuccessPortal(submissionData) {
+  portalOverlay.classList.add('show');
+  
+  let message = "Votre message a été envoyé avec succès ! ";
+  
+  if (submissionData) {
+    if (submissionData.id && submissionData.id.startsWith('LOCAL_')) {
+      message += "Données sauvegardées localement.";
+      mongoIdDisplay.style.display = 'none';
+      viewLocalDataBtn.style.display = 'block';
+    } else {
+      message += "Données sauvegardées dans la base de données.";
+      if (submissionData.id) {
+        mongoIdElement.textContent = submissionData.id.substring(0, 8) + '...';
+        mongoIdDisplay.style.display = 'block';
+      }
+      viewLocalDataBtn.style.display = 'none';
+    }
+  }
+  
+  portalMessage.textContent = message;
+  
+  // Animation d'entrée
+  const portal = portalOverlay.querySelector('.portal');
+  portal.style.animation = 'float 3s ease-in-out infinite';
+  
+  // Mettre à jour le compteur d'Easter Eggs
+  portalEggCount.textContent = eggCount;
+}
+
+/* lock UI until user confirms volume modal */
+function lockUI(){ mainContainer.classList.add('locked'); volumeModal.style.display = 'flex'; }
+function unlockUI(){ mainContainer.classList.remove('locked'); volumeModal.style.display = 'none'; }
+
+/* show/hide rainbow */
+function showRainbow(){ rainbow.classList.add('show'); }
+function hideRainbow(){ rainbow.classList.remove('show'); }
+
+/* set gifs */
+function setGifs(list){
+  gifs.innerHTML = '';
+  list.forEach(u => {
+    const img = document.createElement('img'); img.src = u; img.alt = 'gif';
+    gifs.appendChild(img);
+  });
+}
+
+/* check if volume likely off (can't read system volume); we check element muted/volume and try a silent play */
+async function quickPlaybackTest() {
+  if (audio.muted === true || audio.volume === 0) return false;
+  const originalSrc = audio.src;
+  let test = originalSrc || mp3.female || mp3.male;
+  if (!test) return false;
+  try {
+    audio.src = test;
+    audio.currentTime = 0;
+    await audio.play();
+    audio.pause();
+    if (!originalSrc) audio.removeAttribute('src');
+    return true;
+  } catch (err) {
+    if (!originalSrc) audio.removeAttribute('src');
+    return false;
+  }
+}
+
+/* handle confirm: user claims to have set system volume */
+confirmBtn.addEventListener('click', async () => {
+  // run a quick test to see if autoplay will work
+  const ok = await quickPlaybackTest();
+  if (!ok) {
+    // show friendly notice so user adjusts real system volume
+    notice.textContent = "Impossible de lancer l'audio automatiquement : vérifiez le volume système et les extensions (bloqueurs).";
+    notice.classList.add('visible');
+    // keep modal open so user can click again after adjusting
+    return;
+  }
+  notice.classList.remove('visible');
+  unlockUI();
+  document.getElementById('name').focus();
+});
+
+/* help button */
+document.getElementById('muteTip').addEventListener('click', () => {
+  alert("Astuce : utilisez vos touches volume (↑/↓), l'icône du haut-parleur dans la barre des tâches, ou votre casque. Puis cliquez sur 'J'ai monté le son'.");
+});
+
+/* open reminder from header */
+document.getElementById('openReminder').addEventListener('click', () => {
+  lockUI();
+});
+
+/* gender selection -> attempt to play local MP3 */
+document.querySelectorAll("input[name='gender']").forEach(radio => {
+  radio.addEventListener('change', async (e) => {
+    const v = e.target.value;
+    currentGender = v;
+    const track = (v === 'female') ? mp3.female : mp3.male;
+    if (!track) {
+      setGifs(gifsByGender[v] || []);
+      return;
+    }
+
+    // attempt playback (user already interacted by clicking radio)
+    audio.src = track;
+    audio.currentTime = 0;
+    audio.play().then(()=> {
+      setGifs(gifsByGender[v] || []);
+      showRainbow();
+    }).catch(err => {
+      console.warn('Playback blocked:', err);
+      notice.textContent = "Lecture bloquée : cliquez n'importe où puis recliquez votre choix, ou vérifiez extensions.";
+      notice.classList.add('visible');
+    });
+  });
+});
+
+/* micro-party */
+miniBtn.addEventListener('click', () => {
+  setGifs(gifsByGender.female.concat(gifsByGender.male));
+  showRainbow();
+  setTimeout(()=> hideRainbow(), 3800);
+});
+
+/* form submit - MODIFIÉ POUR ENVOYER AU BACKEND */
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  // Validation avec Zod
+  if (!validateForm()) {
+    // Animation de shake sur le bouton d'envoi
+    sendBtn.style.animation = 'shake 0.5s';
+    setTimeout(() => {
+      sendBtn.style.animation = '';
+    }, 500);
+    return;
+  }
+  
+  // Récupérer les données du formulaire
+  const formData = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    subject: document.getElementById('subject').value.trim(),
+    message: document.getElementById('message').value.trim(),
+    gender: document.querySelector('input[name="gender"]:checked').value
+  };
+  
+  // Afficher le loading
+  showLoading(true);
+  
+  try {
+    let submissionResult;
+    
+    // Vérifier si le backend est en ligne
+    const backendAvailable = await checkBackendStatus();
+    
+    if (backendAvailable) {
+      try {
+        // Essayer d'envoyer au backend
+        submissionResult = await submitToBackend(formData);
+        console.log('✅ Soumission backend réussie:', submissionResult);
+        
+        // Afficher le portail de succès avec les données du backend
+        showSuccessPortal(submissionResult);
+        
+      } catch (backendError) {
+        // Si le backend échoue, sauvegarder localement
+        console.warn('⚠️ Échec backend, sauvegarde locale:', backendError);
+        notice.textContent = `⚠️ Serveur temporairement indisponible. Vos données seront sauvegardées localement.`;
+        notice.classList.add('visible');
+        
+        submissionResult = saveToLocalStorage(formData);
+        showSuccessPortal(submissionResult);
+      }
+    } else {
+      // Backend non disponible, sauvegarder localement
+      console.log('⚠️ Backend non disponible, sauvegarde locale');
+      notice.textContent = '⚠️ Serveur temporairement indisponible. Vos données seront sauvegardées localement.';
+      notice.classList.add('visible');
+      
+      submissionResult = saveToLocalStorage(formData);
+      showSuccessPortal(submissionResult);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur critique:', error);
+    notice.textContent = '❌ Une erreur critique est survenue. Veuillez réessayer.';
+    notice.classList.add('visible');
+    
+    // Afficher quand même un message de succès
+    showSuccessPortal({ id: 'ERROR_' + Date.now() });
+    
+  } finally {
+    // Cacher le loading
+    showLoading(false);
+    
+    // Réinitialiser le formulaire après un délai
+    setTimeout(() => {
+      document.getElementById('form').reset();
+      // Retirer les classes de validation
+      document.querySelectorAll('.input-field').forEach(field => {
+        field.classList.remove('valid', 'error');
+      });
+      document.querySelectorAll('.error-message').forEach(el => {
+        el.classList.remove('show');
+      });
+    }, 500);
+    
+    // Arrêter l'audio
+    try { 
+      audio.pause(); 
+      audio.currentTime = 0; 
+    } catch(e) {}
+    hideRainbow();
+  }
+});
+
+// Fermer le portail
+closePortalBtn.addEventListener('click', () => {
+  portalOverlay.classList.remove('show');
+});
+
+// Afficher les données locales
+viewLocalDataBtn.addEventListener('click', () => {
+  const localCount = submissionHistory.length;
+  alert(`📁 Données sauvegardées localement : ${localCount} soumission(s)\n\n` +
+        `Dernière soumission : ${submissionHistory[submissionHistory.length - 1]?.timestamp || 'Aucune'}\n\n` +
+        `Les données seront synchronisées avec le backend dès qu'il sera disponible.`);
+});
+
+// Raccourci Ctrl+Enter pour soumettre
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'Enter') {
+    document.getElementById('send').click();
+  }
+});
+
+// Easter Egg sur le logo
+logo.addEventListener('click', () => {
+  logo.style.transform = 'skewX(-6deg) rotate(360deg)';
+  logo.style.transition = 'transform 0.5s';
+  setTimeout(() => {
+    logo.style.transform = 'skewX(-6deg)';
+  }, 500);
+});
+
+/* initially lock UI */
+document.addEventListener('DOMContentLoaded', async () => {
+  lockUI();
+  createStars();
+  setupRealTimeValidation();
+  setupKonamiCode();
+  setupTitleEasterEgg();
+  
+  // Vérifier le statut du backend
+  await checkBackendStatus();
+  
+  // Vérifier périodiquement le statut (toutes les 30 secondes)
+  setInterval(() => {
+    checkBackendStatus();
+  }, 30000);
+});
+
+/* quick UX: clicking the page once may unlock audio autoplay on some browsers */
+window.addEventListener('pointerdown', ()=>{}, {once:true});
+</script>
+</body>
+</html>
